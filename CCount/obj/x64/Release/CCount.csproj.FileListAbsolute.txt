@@ -1,0 +1,10 @@
+D:\workspace_VS\CCount\CCount\bin\x64\Release\CCount.exe.config
+D:\workspace_VS\CCount\CCount\bin\x64\Release\CCount.exe
+D:\workspace_VS\CCount\CCount\bin\x64\Release\CCount.pdb
+D:\workspace_VS\CCount\CCount\obj\x64\Release\CCount.Form1.resources
+D:\workspace_VS\CCount\CCount\obj\x64\Release\CCount.Properties.Resources.resources
+D:\workspace_VS\CCount\CCount\obj\x64\Release\CCount.csproj.GenerateResource.cache
+D:\workspace_VS\CCount\CCount\obj\x64\Release\CCount.csproj.CoreCompileInputs.cache
+D:\workspace_VS\CCount\CCount\obj\x64\Release\CCount.exe
+D:\workspace_VS\CCount\CCount\obj\x64\Release\CCount.pdb
+D:\workspace_VS\CCount\CCount\obj\x64\Release\CCount.csprojAssemblyReference.cache

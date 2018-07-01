@@ -1,5 +1,6 @@
 ﻿using Microsoft.VisualBasic;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.IO.Compression;
@@ -19,29 +20,26 @@ namespace CCount
             InitializeComponent();
         }
 
-        void UpdateUi()
+        void update_ui()
         {
             label1.Text = count.ToString();
-            //297 215
-            label1.Location = new Point(130 - label1.Text.Length * 10, 50);
             Invalidate();
             Update();
         }
 
-        private void button1_Click(object sender, EventArgs e)
+        void button1_Click(object sender, EventArgs e)
         {
             count++;
-            UpdateUi();
+            update_ui();
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        void button2_Click(object sender, EventArgs e)
         {
-            if(count != 0)
-                count--;
-            UpdateUi();
+            count--;
+            update_ui();
         }
 
-        private void button4_Click(object sender, EventArgs e)
+        void button4_Click(object sender, EventArgs e)
         {
             OpenFileDialog ofd = new OpenFileDialog()
             {
@@ -59,38 +57,35 @@ namespace CCount
 
         void LoadCounter(string file)
         {
-            string dir = TempDir;
-            ZipFile.ExtractToDirectory(file, dir);
-            bool enc = File.ReadAllBytes(dir + "\\ENC")[0] == 0x01;
-            byte[] bytes = File.ReadAllBytes(dir + "\\COUNT");
-            byte[] hash = File.ReadAllBytes(dir + "\\HASH");
-            byte[] label = File.ReadAllBytes(dir + "\\LABEL");
+            ZipArchive zip = ZipFile.Open(file, ZipArchiveMode.Read, Encoding.ASCII);
+            bool enc = zip.GetEntry("ENC").read()[0] == 0x01;
+            byte[] bytes = zip.GetEntry("COUNT").read();
+            byte[] hash = zip.GetEntry("HASH").read();
+            byte[] label = zip.GetEntry("LABEL").read();
             if (enc)
             {
                 string pw = "";
-                bool flag = false;
-                while (!flag)
+                while (true)
                 {
                     pw = Interaction.InputBox("Please enter your password to decrypt:", "Password for opening encryption | CCount");
-                    if (!AreEqual(hash, Hash(pw)))
-                    {
-                        flag = false;
-                        MessageBox.Show("Hash-check failed. Your password seems to be invalid.");
-                    }
+
+                    if (pw == "")
+                        return;
+                    else if (hash.equals(Hash(pw)))
+                        break;
                     else
-                        flag = true;
+                        MessageBox.Show("Hash-check failed. Your password seems to be invalid.");
                 }
                 bytes = Decrypt(bytes, pw);
                 label = Decrypt(label, pw);
             }
             count = new BigInteger(bytes);
             textBox1.Text = Encoding.UTF8.GetString(label);
-            UpdateUi();
+            update_ui();
         }
 
-        void SaveCounter(string file, bool enc)
+        void save_counter(string file, bool enc)
         {
-            string dir = TempDir;
             byte[] bytes = count.ToByteArray();
             byte[] hash = new byte[0];
             byte[] label = Encoding.UTF8.GetBytes(textBox1.Text);
@@ -101,52 +96,26 @@ namespace CCount
                 label = Encrypt(label, pw);
                 hash = Hash(pw);
             }
-            File.WriteAllBytes(dir + "\\ENC", new byte[] { (byte)(enc ? 0x01 : 0x00) });
-            File.WriteAllBytes(dir + "\\COUNT", bytes);
-            File.WriteAllBytes(dir + "\\LABEL", label);
-            File.WriteAllBytes(dir + "\\HASH", hash);
-            ZipFile.CreateFromDirectory(dir, file);
+            ZipArchive zip = ZipFile.Open(file, ZipArchiveMode.Create, Encoding.ASCII);
+            zip.add_entry("ENC", enc ? (byte)0x01 : (byte)0x00, CompressionLevel.Fastest);
+            zip.add_entry("COUNT", bytes, CompressionLevel.Optimal);
+            zip.add_entry("LABEL", label, CompressionLevel.Optimal);
+            zip.add_entry("HASH", hash, CompressionLevel.Optimal);
         }
 
-        bool AreEqual(byte[] one, byte[] two)
-        {
-            if (one.Length != two.Length)
-                return false;
-            for (int i = 0; i < one.Length; i++)
-                if (one[i] != two[i])
-                    return false;
-            return true;
-        }
 
-        static Random r = new Random();
 
-        static string TempDir
-        {
-            get
-            {
-                string s = "C:\\Users";
-                while (Directory.Exists(s))
-                    s = Path.GetTempPath() + '\\' + r.Next();
-                Directory.CreateDirectory(s);
-                return s;
-            }
-        }
-
-        static int _iterations = 2;
-        static byte[] vectorBytes = Encoding.ASCII.GetBytes("8947az34awl34kjq");
-        static byte[] saltBytes = Encoding.ASCII.GetBytes("aselrias38490a32");
-
-        static byte[] Encrypt(byte[] value, string password)
+        byte[] Encrypt(byte[] value, string password)
         {
             byte[] encrypted;
             using (var cipher = new AesManaged())
             {
-                PasswordDeriveBytes _passwordBytes = new PasswordDeriveBytes(password, saltBytes, "SHA1", _iterations);
+                PasswordDeriveBytes _passwordBytes = new PasswordDeriveBytes(password, Encoding.ASCII.GetBytes("aselrias38490a32"), "SHA1", 2);
                 byte[] keyBytes = _passwordBytes.GetBytes(32);
 
                 cipher.Mode = CipherMode.CBC;
 
-                using (ICryptoTransform encryptor = cipher.CreateEncryptor(keyBytes, vectorBytes))
+                using (ICryptoTransform encryptor = cipher.CreateEncryptor(keyBytes, Encoding.ASCII.GetBytes("8947az34awl34kjq")))
                     using (MemoryStream to = new MemoryStream())
                         using (CryptoStream writer = new CryptoStream(to, encryptor, CryptoStreamMode.Write))
                         {
@@ -159,18 +128,18 @@ namespace CCount
             return encrypted;
         }
 
-        static byte[] Decrypt(byte[] value, string password)
+        byte[] Decrypt(byte[] value, string password)
         {
             byte[] decrypted;
             int lenght = 0;
             using (var cipher = new AesManaged())
             {
-                var _passwordBytes = new PasswordDeriveBytes(password, saltBytes, "SHA1", _iterations);
+                var _passwordBytes = new PasswordDeriveBytes(password, Encoding.ASCII.GetBytes("aselrias38490a32"), "SHA1", 2);
                 var keyBytes = _passwordBytes.GetBytes(32);
 
                 cipher.Mode = CipherMode.CBC;
 
-                using (var decryptor = cipher.CreateDecryptor(keyBytes, vectorBytes))
+                using (var decryptor = cipher.CreateDecryptor(keyBytes, Encoding.ASCII.GetBytes("8947az34awl34kjq")))
                     using (var reader = new CryptoStream(new MemoryStream(value), decryptor, CryptoStreamMode.Read))
                     {
                         decrypted = new byte[value.Length];
@@ -184,12 +153,11 @@ namespace CCount
             return Out;
         }
 
-        static byte[] Hash(string text)
-        {
-            return new SHA512Managed().ComputeHash(Encoding.UTF32.GetBytes(text));
-        }
+        SHA512Managed sha = new SHA512Managed();
 
-        private void button3_Click(object sender, EventArgs e)
+        byte[] Hash(string text) => sha.ComputeHash(Encoding.UTF32.GetBytes(text));
+
+        void button3_Click(object sender, EventArgs e)
         {
             SaveFileDialog sfd = new SaveFileDialog()
             {
@@ -200,10 +168,10 @@ namespace CCount
             };
             var res = sfd.ShowDialog();
             if (res == DialogResult.OK || res == DialogResult.Yes)
-                SaveCounter(sfd.FileName, false);
+                save_counter(sfd.FileName, false);
         }
 
-        private void button5_Click(object sender, EventArgs e)
+        void button5_Click(object sender, EventArgs e)
         {
             SaveFileDialog sfd = new SaveFileDialog()
             {
@@ -214,15 +182,57 @@ namespace CCount
             };
             var res = sfd.ShowDialog();
             if (res == DialogResult.OK || res == DialogResult.Yes)
-                SaveCounter(sfd.FileName, true);
+                save_counter(sfd.FileName, true);
         }
 
-        private void label1_Click(object sender, EventArgs e)
+        void txt_click(object sender, EventArgs e)
         {
-            bool flag = false;
-            while (!flag)
-                flag = BigInteger.TryParse(Interaction.InputBox("Set the counter to: ", "Sedd dadd counddaa", label1.Text), out count);
-            UpdateUi();
+            bool b = false;
+            while (!b)
+                b = BigInteger.TryParse(Interaction.InputBox("Set the counter to: ", "Sedd dadd counddaa", label1.Text), out count);
+            update_ui();
+        }
+    }
+
+    static class Util
+    {
+        public static void add_entry(this ZipArchive z, string n, byte[] cts, CompressionLevel comp)
+        {
+            Stream s = z.CreateEntry(n, comp).Open();
+            s.Write(cts, 0, cts.Length);
+            s.Close();
+            s.Dispose();
+        }
+
+        public static void add_entry(this ZipArchive z, string n, byte ct, CompressionLevel comp)
+        {
+            Stream s = z.CreateEntry(n, comp).Open();
+            s.Write(new byte[] { ct }, 0, 1);
+            s.Close();
+            s.Dispose();
+        }
+
+        public static bool equals(this byte[] left, byte[] right)
+        {
+            if (left.Length != right.Length)
+                return false;
+            for (int i = 0; i < left.Length; i++)
+                if (left[i] != right[i])
+                    return false;
+            return true;
+        }
+
+        public static byte[] read(this ZipArchiveEntry entry)
+        {
+            Stream s = entry.Open();
+            byte[] b = new byte[32767];
+            List<byte> bs = new List<byte>();
+            int count = -1;
+            while ((count = s.Read(b, 0, b.Length)) > 0)
+                bs.AddRange(b);
+            s.Close();
+            s.Dispose();
+            return bs.ToArray();
         }
     }
 }

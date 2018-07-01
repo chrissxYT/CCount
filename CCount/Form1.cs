@@ -1,7 +1,6 @@
 ﻿using Microsoft.VisualBasic;
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Numerics;
@@ -52,10 +51,10 @@ namespace CCount
             };
             var res = ofd.ShowDialog();
             if (res == DialogResult.OK || res == DialogResult.Yes)
-                LoadCounter(ofd.FileName);
+                load_counter(ofd.FileName);
         }
 
-        void LoadCounter(string file)
+        void load_counter(string file)
         {
             ZipArchive zip = ZipFile.Open(file, ZipArchiveMode.Read, Encoding.ASCII);
             bool enc = zip.GetEntry("ENC").read()[0] == 0x01;
@@ -71,13 +70,13 @@ namespace CCount
 
                     if (pw == "")
                         return;
-                    else if (hash.equals(Hash(pw)))
+                    else if (hash.equals(this.hash(pw)))
                         break;
                     else
                         MessageBox.Show("Hash-check failed. Your password seems to be invalid.");
                 }
-                bytes = Decrypt(bytes, pw);
-                label = Decrypt(label, pw);
+                bytes = Util.dec(bytes, pw);
+                label = Util.dec(label, pw);
             }
             count = new BigInteger(bytes);
             textBox1.Text = Encoding.UTF8.GetString(label);
@@ -92,9 +91,9 @@ namespace CCount
             if (enc)
             {
                 string pw = Interaction.InputBox("Please enter a password to encrypt with: ", "Password for encryption | CCount");
-                bytes = Encrypt(bytes, pw);
-                label = Encrypt(label, pw);
-                hash = Hash(pw);
+                bytes = Util.enc(bytes, pw);
+                label = Util.enc(label, pw);
+                hash = this.hash(pw);
             }
             ZipArchive zip = ZipFile.Open(file, ZipArchiveMode.Create, Encoding.ASCII);
             zip.add_entry("ENC", enc ? (byte)0x01 : (byte)0x00, CompressionLevel.Fastest);
@@ -105,57 +104,11 @@ namespace CCount
 
 
 
-        byte[] Encrypt(byte[] value, string password)
-        {
-            byte[] encrypted;
-            using (var cipher = new AesManaged())
-            {
-                PasswordDeriveBytes _passwordBytes = new PasswordDeriveBytes(password, Encoding.ASCII.GetBytes("aselrias38490a32"), "SHA1", 2);
-                byte[] keyBytes = _passwordBytes.GetBytes(32);
-
-                cipher.Mode = CipherMode.CBC;
-
-                using (ICryptoTransform encryptor = cipher.CreateEncryptor(keyBytes, Encoding.ASCII.GetBytes("8947az34awl34kjq")))
-                    using (MemoryStream to = new MemoryStream())
-                        using (CryptoStream writer = new CryptoStream(to, encryptor, CryptoStreamMode.Write))
-                        {
-                            writer.Write(value, 0, value.Length);
-                            writer.FlushFinalBlock();
-                            encrypted = to.ToArray();
-                        }
-                cipher.Clear();
-            }
-            return encrypted;
-        }
-
-        byte[] Decrypt(byte[] value, string password)
-        {
-            byte[] decrypted;
-            int lenght = 0;
-            using (var cipher = new AesManaged())
-            {
-                var _passwordBytes = new PasswordDeriveBytes(password, Encoding.ASCII.GetBytes("aselrias38490a32"), "SHA1", 2);
-                var keyBytes = _passwordBytes.GetBytes(32);
-
-                cipher.Mode = CipherMode.CBC;
-
-                using (var decryptor = cipher.CreateDecryptor(keyBytes, Encoding.ASCII.GetBytes("8947az34awl34kjq")))
-                    using (var reader = new CryptoStream(new MemoryStream(value), decryptor, CryptoStreamMode.Read))
-                    {
-                        decrypted = new byte[value.Length];
-                        lenght = reader.Read(decrypted, 0, decrypted.Length);
-                    }
-
-                cipher.Clear();
-            }
-            byte[] Out = new byte[lenght];
-            Array.Copy(decrypted, Out, lenght);
-            return Out;
-        }
+        
 
         SHA512Managed sha = new SHA512Managed();
 
-        byte[] Hash(string text) => sha.ComputeHash(Encoding.UTF32.GetBytes(text));
+        byte[] hash(string text) => sha.ComputeHash(Encoding.UTF32.GetBytes(text));
 
         void button3_Click(object sender, EventArgs e)
         {
@@ -171,7 +124,7 @@ namespace CCount
                 save_counter(sfd.FileName, false);
         }
 
-        void button5_Click(object sender, EventArgs e)
+        void btn5_click(object sender, EventArgs e)
         {
             SaveFileDialog sfd = new SaveFileDialog()
             {
@@ -233,6 +186,54 @@ namespace CCount
             s.Close();
             s.Dispose();
             return bs.ToArray();
+        }
+
+        public static byte[] enc(byte[] value, string password)
+        {
+            byte[] encrypted;
+            using (var cipher = new AesManaged())
+            {
+                PasswordDeriveBytes _passwordBytes = new PasswordDeriveBytes(password, Encoding.ASCII.GetBytes("aselrias38490a32"), "SHA1", 2);
+                byte[] keyBytes = _passwordBytes.GetBytes(32);
+
+                cipher.Mode = CipherMode.CBC;
+
+                using (ICryptoTransform encryptor = cipher.CreateEncryptor(keyBytes, Encoding.ASCII.GetBytes("8947az34awl34kjq")))
+                using (MemoryStream to = new MemoryStream())
+                using (CryptoStream writer = new CryptoStream(to, encryptor, CryptoStreamMode.Write))
+                {
+                    writer.Write(value, 0, value.Length);
+                    writer.FlushFinalBlock();
+                    encrypted = to.ToArray();
+                }
+                cipher.Clear();
+            }
+            return encrypted;
+        }
+
+        public static byte[] dec(byte[] value, string password)
+        {
+            byte[] decrypted;
+            int lenght = 0;
+            using (var cipher = new AesManaged())
+            {
+                var _passwordBytes = new PasswordDeriveBytes(password, Encoding.ASCII.GetBytes("aselrias38490a32"), "SHA1", 2);
+                var keyBytes = _passwordBytes.GetBytes(32);
+
+                cipher.Mode = CipherMode.CBC;
+
+                using (var decryptor = cipher.CreateDecryptor(keyBytes, Encoding.ASCII.GetBytes("8947az34awl34kjq")))
+                using (var reader = new CryptoStream(new MemoryStream(value), decryptor, CryptoStreamMode.Read))
+                {
+                    decrypted = new byte[value.Length];
+                    lenght = reader.Read(decrypted, 0, decrypted.Length);
+                }
+
+                cipher.Clear();
+            }
+            byte[] Out = new byte[lenght];
+            Array.Copy(decrypted, Out, lenght);
+            return Out;
         }
     }
 }
